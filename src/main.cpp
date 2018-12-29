@@ -5,6 +5,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <algorithm>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
@@ -250,6 +251,7 @@ int main() {
               bool too_close = false;
               bool can_go_left = false;
               bool can_go_right = false;
+              bool impending_collision = false;
               double match_speed = ref_vel;
               double gap_left = 10000.0;
               double back_gap_left = 10000.0;
@@ -260,7 +262,7 @@ int main() {
 
               for(int i = 0; i < sensor_fusion.size(); i += 1) {
                 float d = sensor_fusion[i][6];
-                if(d < 2+4*(lane - 1)+2 && d > 2+4*(lane - 1)-2) {
+                if(lane > 0 && d < 2+4*(lane - 1)+2 && d > 2+4*(lane - 1)-2) {
                   double vx = sensor_fusion[i][3];
                   double vy = sensor_fusion[i][4];
                   double check_speed = sqrt(vx*vx+vy*vy);
@@ -278,7 +280,7 @@ int main() {
                     }
                   }
                 }
-                if(d < 2+4*(lane + 1)+2 && d > 2+4*(lane + 1)-2) {
+                if(lane < 2 && d < 2+4*(lane + 1)+2 && d > 2+4*(lane + 1)-2) {
                   double vx = sensor_fusion[i][3];
                   double vy = sensor_fusion[i][4];
                   double check_speed = sqrt(vx*vx+vy*vy);
@@ -329,32 +331,71 @@ int main() {
 
 //              cout << gap_left << ", " << gap_right << " | " << back_gap_left << ", " << back_gap_right << endl;
 
-              if(gap_s < 30 && ref_vel > match_speed*2.24) {
-                ref_vel -= 0.224;
-              } else {
-                if(ref_vel < 49.5) {
-                  ref_vel += 0.224;
-                }
-              }
-
-              if(back_gap < 6 || gap_s < 6) {
+              if(back_gap < 7 || gap_s < 7) {
                 // TODO: Slow down, speed up, or change lanes if it's safe
                 // Check for change lanes first since it's the best way to avoid collisons
-                // if the other car is ahead of us (ie gap_s < 6, slow down)
-                // if the other car is behind us (ie back_gap < 6, then speed up if it' safe)
+                // if the other car is ahead of us (ie gap_s < 7, slow down)
+                // if the other car is behind us (ie back_gap < 7, then speed up if it' safe)
+                impending_collision = true;
                 cout << "Danger! Collision Imminent: " << back_gap << "," << gap_s << endl;
               }
 
-              if(gap_s < 60) {
-                if (back_gap_left > 6 && gap_left >= gap_right && gap_left > gap_s + 20) {
-                  cout << "I should change lanes left" << endl;
-                } else if (back_gap_right > 6 && gap_right >= gap_right && gap_right > gap_s + 20) {
-                  cout << "I should change lanes right" << endl;
-                } else {
-                  cout << "I should keep lane" << endl;
+//              else if(ref_vel < 49.5 && gap_s > 10 && abs(ref_vel - (match_speed*2.24) < 1)) {
+//                ref_vel += 0.224;
+//              }  else if(ref_vel < 49.5 && gap_s < 10 && abs(ref_vel - (match_speed*2.24) < 1)) {
+//                ref_vel -= 0.224;
+//              }
+              if(impending_collision) {
+                // adjust speed to defend from collision
+                if(gap_s < 7 && back_gap < 7) {
+                  // bad situation: stay at constant speed
+                } else if(gap_s < 7) {
+                  ref_vel -= 0.224;
+                } else if(back_gap < 7 && ref_vel < 49.5) {
+                  ref_vel += 0.224;
                 }
+              } else if(gap_s < 10) {
+                // avoid getting too close. slow down if car is less than 10 meters from leading car
+                ref_vel -= 0.224;
+              } else if(gap_s < 20) {
+                if(ref_vel > match_speed*2.24) {
+                  // slow down if car is going faster than leading car.
+                  ref_vel -= 0.224;
+                } else {
+                  // speed up if car is going slower than leading car
+                  ref_vel += 0.224;
+                }
+              } else if(ref_vel < 49.5) {
+                ref_vel += 0.224;
+              }
+
+              if(impending_collision) {
+                // if collision is likely, change lanes
+                if(lane > 0 && back_gap_left > 7 && gap_left > 7) {
+                  lane -= 1;
+                } else if(lane < 2 && back_gap_right > 7 && gap_right > 7) {
+                  lane += 1;
+                }
+              } else if(gap_s < 60) {
+                if (lane > 0 && back_gap_left > 7 && gap_left >= gap_right && gap_left > gap_s + 20) {
+//                  cout << "I should change lanes left: " << back_gap << ", " << gap_s << ", " << gap_left << ", " << gap_right << endl;
+                  lane -= 1;
+                } else if (lane < 2 && back_gap_right > 7 && gap_right >= gap_left && gap_right > gap_s + 20) {
+//                  cout << "I should change lanes right: " << back_gap << ", " << gap_s << ", " << gap_left << ", " << gap_right << endl;
+                  lane += 1;
+                } else if (lane == 0 && back_gap_right > 7 && gap_right > 7 && (gap_right > gap_s - 20)) {
+                  lane = 1;
+                } else if (lane == 2 && back_gap_left > 7 && gap_left > 7 & gap_left > gap_s - 20) {
+                  lane = 1;
+                } else {
+//                    cout << "I should keep lane: " << back_gap << ", " << gap_s << ", " << gap_left << ", " << gap_right << endl;
+                }
+              } else if (lane == 0 && back_gap_right > 7 && gap_right > 7 && gap_right > 90) {
+                lane = 1;
+              } else if (lane == 2 && back_gap_left > 7 && gap_left > 7 && gap_left > 90) {
+                lane = 1;
               } else {
-                cout << "I should keep lane" << endl;
+//                cout << "I should keep lane: " << back_gap << ", " << gap_s << ", " << gap_left << ", " << gap_right << endl;
               }
 
 
@@ -392,11 +433,23 @@ int main() {
                 ptsy.push_back(ref_y);
               }
 
-              vector<double> next_wp0 = getXY(car_s + 30, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+              double new_d = 2 + 4 * lane;
+              double d_diff = new_d - car_d;
+              int d1;
+              if(d_diff > 0) {
+                d1 = car_d + min(4.0, d_diff);
+              } else {
+                d1 = car_d + max(-4.0, d_diff);
+              }
+              cout << car_d << ", " << d1 << endl;
+//              double d2 = min(3, d_diff);
+//              double d3 = min(4, d_diff);
+
+              vector<double> next_wp0 = getXY(car_s + 30, d1, map_waypoints_s, map_waypoints_x,
                                               map_waypoints_y);
-              vector<double> next_wp1 = getXY(car_s + 60, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+              vector<double> next_wp1 = getXY(car_s + 60, d1, map_waypoints_s, map_waypoints_x,
                                               map_waypoints_y);
-              vector<double> next_wp2 = getXY(car_s + 90, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+              vector<double> next_wp2 = getXY(car_s + 90, d1, map_waypoints_s, map_waypoints_x,
                                               map_waypoints_y);
 
               ptsx.push_back(next_wp0[0]);
