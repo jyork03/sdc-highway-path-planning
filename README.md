@@ -1,5 +1,48 @@
-# CarND-Path-Planning-Project
-Self-Driving Car Engineer Nanodegree Program
+# Highway Path Planning
+The car should drive around the track as fast as it can at all times
+without exceeding the speed (m/s), acceleration (m/s^2) or jerk (m/s^3)
+thresholds.
+
+### Model Details
+Currently, control decisions are made via decision trees, which are used 
+to set explicit values for velocity and lane changes.
+
+The model starts by iterating through the sensor fusion data to calculate
+the gaps between the ego car and other cars in the current and surrounding
+lanes.  If the gaps are too small in the current lane, a boolean flag is set
+to take and impending collision into consideration.
+
+At 60 meters distance from the leading car, it begins to search for opportunities
+to change lanes.  It checks the left lane first for the ability to safely pass,
+and then checks the right lane.  The car is programmed to favor the middle lane
+since it provides more opportunities for passing.
+
+The car is instructed to drive as near to 49.5mph as it can, unless another
+car is in front of it.  At a distance of 20 meters from the leaading car, it
+begins to slow down to match it's velocity.  If no lane change opportunities
+are available, it will keep trailing the leading car (while possibly moving to the
+middle lane) until an opportunity opens up.
+
+It should be noted that these control decisions are made in Frenet coordinates
+and must be transformed back into global cartesian coordinates before being
+fed back into the simulator.
+
+We start by creating 5 cartesian XY points.  The first two come from the end of
+the previous path that was sent to the simulator (or the car's current position)
+if those are not available.  The other three points are selected at regular
+intervals of 30 Frenet `s` units of distance ahead of the car.  These 5 XY points
+are then transformed to the car's local reference, and then are used to create
+a spline trajectory.
+
+Finally, generate 50 points along the spline, spaced accordingly so that our
+reference velocity is accurate.  Then the points are transformed back into the
+global frame of reference and fed into the simulator.
+
+### Future Considerations
+1. Use cost functions to make control decisions (velocity, lane changes)
+2. Use Finite State Machine to define the state of the car, and the transitions between states.
+3. Make use of Jerk Minimizing Trajectories
+4. Incorporate search algorithms (A*, Dynamic Programming, etc.)
    
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).

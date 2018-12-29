@@ -197,9 +197,8 @@ int main() {
 
   double ref_vel = 0.00; // reference velocity in mph
   int lane = 1;
-  double gap_s = 10000;
   h.onMessage(
-      [&gap_s, &ref_vel, &lane, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy](
+      [&ref_vel, &lane, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy](
           uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
           uWS::OpCode opCode) {
         // "42" at the start of the message means there's a websocket message event.
@@ -248,16 +247,13 @@ int main() {
                 car_s = end_path_s;
               }
 
-              bool too_close = false;
-              bool can_go_left = false;
-              bool can_go_right = false;
               bool impending_collision = false;
               double match_speed = ref_vel;
               double gap_left = 10000.0;
               double back_gap_left = 10000.0;
               double gap_right = 10000.0;
               double back_gap_right = 10000.0;
-              gap_s = 10000.0;
+              double gap_s = 10000.0;
               double back_gap = 10000.0;
 
               for(int i = 0; i < sensor_fusion.size(); i += 1) {
@@ -305,7 +301,6 @@ int main() {
                   double check_car_s = sensor_fusion[i][5];
 
                   check_car_s += (double)prev_size*.02*check_speed;
-//                  gap_s = check_car_s - car_s;
 
                   if(check_car_s > car_s) {
                     double gap = check_car_s - car_s;
@@ -319,9 +314,6 @@ int main() {
                       back_gap = gap;
                     }
                   }
-//                  if((check_car_s > car_s) && ((check_car_s - car_s) < 30)) {
-//                    too_close = true;
-//                  }
                 }
               }
 
@@ -332,7 +324,6 @@ int main() {
 //              cout << gap_left << ", " << gap_right << " | " << back_gap_left << ", " << back_gap_right << endl;
 
               if(back_gap < 7 || gap_s < 7) {
-                // TODO: Slow down, speed up, or change lanes if it's safe
                 // Check for change lanes first since it's the best way to avoid collisons
                 // if the other car is ahead of us (ie gap_s < 7, slow down)
                 // if the other car is behind us (ie back_gap < 7, then speed up if it' safe)
@@ -340,11 +331,6 @@ int main() {
                 cout << "Danger! Collision Imminent: " << back_gap << "," << gap_s << endl;
               }
 
-//              else if(ref_vel < 49.5 && gap_s > 10 && abs(ref_vel - (match_speed*2.24) < 1)) {
-//                ref_vel += 0.224;
-//              }  else if(ref_vel < 49.5 && gap_s < 10 && abs(ref_vel - (match_speed*2.24) < 1)) {
-//                ref_vel -= 0.224;
-//              }
               if(impending_collision) {
                 // adjust speed to defend from collision
                 if(gap_s < 7 && back_gap < 7) {
@@ -435,21 +421,19 @@ int main() {
 
               double new_d = 2 + 4 * lane;
               double d_diff = new_d - car_d;
-              int d1;
+              int constrained_d;
               if(d_diff > 0) {
-                d1 = car_d + min(4.0, d_diff);
+                constrained_d = car_d + min(4.0, d_diff);
               } else {
-                d1 = car_d + max(-4.0, d_diff);
+                constrained_d = car_d + max(-4.0, d_diff);
               }
-              cout << car_d << ", " << d1 << endl;
-//              double d2 = min(3, d_diff);
-//              double d3 = min(4, d_diff);
+//              cout << car_d << ", " << constrained_d << endl;
 
-              vector<double> next_wp0 = getXY(car_s + 30, d1, map_waypoints_s, map_waypoints_x,
+              vector<double> next_wp0 = getXY(car_s + 30, constrained_d, map_waypoints_s, map_waypoints_x,
                                               map_waypoints_y);
-              vector<double> next_wp1 = getXY(car_s + 60, d1, map_waypoints_s, map_waypoints_x,
+              vector<double> next_wp1 = getXY(car_s + 60, constrained_d, map_waypoints_s, map_waypoints_x,
                                               map_waypoints_y);
-              vector<double> next_wp2 = getXY(car_s + 90, d1, map_waypoints_s, map_waypoints_x,
+              vector<double> next_wp2 = getXY(car_s + 90, constrained_d, map_waypoints_s, map_waypoints_x,
                                               map_waypoints_y);
 
               ptsx.push_back(next_wp0[0]);
