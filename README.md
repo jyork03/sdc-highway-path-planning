@@ -5,7 +5,8 @@ thresholds.
 
 ### Model Details
 Currently, control decisions are made via decision trees, which are used 
-to set explicit values for velocity and lane changes.
+to set explicit values for velocity and lane changes.  Many concepts are
+borrowed from Udacity's Q&A session.
 
 The model starts by iterating through the sensor fusion data to calculate
 the gaps between the ego car and other cars in the current and surrounding
